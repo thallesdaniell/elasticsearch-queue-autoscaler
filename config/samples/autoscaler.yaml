@@ -1,0 +1,26 @@
+apiVersion: autoscaling.queue-autoscaler.io/v1alpha1
+kind: ElasticsearchQueueAutoscaler
+metadata:
+  name: search-queue
+  namespace: elastic-system
+spec:
+  targetRef:
+    name: search
+    nodeSet: hot-data
+  mode: Audit
+  provider: KEDA
+  requestedReplicas: 3
+  scaling:
+    minReplicas: 3
+    maxReplicas: 12
+    maxStep: 2
+    pollSeconds: 30
+    stabilizationSeconds: 120
+    cooldownSeconds: 600
+    convergenceTimeoutSeconds: 2700
+  safety:
+    requiredHealth: green
+    requireDistinctNodes: false # Enable after configuring NodeSet anti-affinity.
+    maxDiskUsedPercent: 90
+    maxShardsPerNode: 800
+    blockScaleDown: true

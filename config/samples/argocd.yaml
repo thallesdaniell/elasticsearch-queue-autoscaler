@@ -1,0 +1,26 @@
+# Merge into your existing ArgoCD Application spec.
+# Do not ignore the whole nodeSets array.
+spec:
+  ignoreDifferences:
+    - group: elasticsearch.k8s.elastic.co
+      kind: Elasticsearch
+      name: search
+      namespace: elastic-system
+      jqPathExpressions:
+        - '.spec.nodeSets[] | select(.name == "hot-data") | .count'
+      jsonPointers:
+        - /metadata/annotations/queue-autoscaler.io~1last-scale
+        - /metadata/annotations/queue-autoscaler.io~1cooldown-until
+        - /metadata/annotations/queue-autoscaler.io~1pending-count
+        - /metadata/annotations/queue-autoscaler.io~1pending-node-set
+    - group: autoscaling.queue-autoscaler.io
+      kind: ElasticsearchQueueAutoscaler
+      name: search-queue
+      namespace: elastic-system
+      jsonPointers:
+        - /spec/requestedReplicas
+  syncPolicy:
+    syncOptions:
+      - RespectIgnoreDifferences=true
+# For multiple NodeSets, add each authorized count and each autoscaler requestedReplicas explicitly.
+# Do not ignore owners: GitOps/administrator retains authorization ownership.

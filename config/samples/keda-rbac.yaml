@@ -1,0 +1,34 @@
+# Optional supplemental permissions for restricted KEDA/HPA installations.
+# Review actual identities first; this does not remove existing ClusterRoles.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: search-queue-scale-writer
+  namespace: elastic-system
+rules:
+  - apiGroups: [autoscaling.queue-autoscaler.io]
+    resources: [elasticsearchqueueautoscalers]
+    resourceNames: [search-queue]
+    verbs: [get]
+  - apiGroups: [autoscaling.queue-autoscaler.io]
+    resources: [elasticsearchqueueautoscalers/scale]
+    resourceNames: [search-queue]
+    verbs: [get, update, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: search-queue-scale-writers
+  namespace: elastic-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: search-queue-scale-writer
+subjects:
+  - kind: ServiceAccount
+    name: keda-operator
+    namespace: keda
+  # Depends on kube-controller-manager identity/configuration.
+  - kind: ServiceAccount
+    name: horizontal-pod-autoscaler
+    namespace: kube-system

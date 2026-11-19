@@ -1,0 +1,16 @@
+domain: queue-autoscaler.io
+layout:
+- go.kubebuilder.io/v4
+projectName: elasticsearch-queue-autoscaler
+repo: github.com/thallesdaniell/elasticsearch-queue-autoscaler
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: queue-autoscaler.io
+  group: autoscaling
+  kind: ElasticsearchQueueAutoscaler
+  path: github.com/thallesdaniell/elasticsearch-queue-autoscaler/api/v1alpha1
+  version: v1alpha1
+version: "3"

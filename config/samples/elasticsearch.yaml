@@ -1,0 +1,41 @@
+# Example only: choose versions/resources/storage for your environment.
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: search
+  namespace: elastic-system
+  annotations:
+    queue-autoscaler.io/owners: '{"hot-data":"search-queue"}'
+spec:
+  version: 8.17.3
+  nodeSets:
+    - name: masters
+      count: 3
+      config:
+        node.roles: [master]
+      podTemplate:
+        spec:
+          containers:
+            - name: elasticsearch
+              resources:
+                requests: {cpu: "1", memory: 2Gi}
+                limits: {memory: 2Gi}
+    - name: hot-data
+      count: 3
+      config:
+        node.roles: [data_hot, data_content, ingest]
+      podTemplate:
+        spec:
+          containers:
+            - name: elasticsearch
+              resources:
+                requests: {cpu: "2", memory: 4Gi}
+                limits: {memory: 4Gi}
+      volumeClaimTemplates:
+        - metadata:
+            name: elasticsearch-data
+          spec:
+            accessModes: [ReadWriteOnce]
+            resources:
+              requests:
+                storage: 100Gi

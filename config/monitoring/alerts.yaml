@@ -1,0 +1,27 @@
+# Plain Prometheus rules; load through your monitoring configuration.
+# Replace job="eqa" with your scrape job. This file is not installed by Helm.
+groups:
+  - name: elasticsearch-queue-autoscaler
+    rules:
+      - alert: EQAControllerUnavailable
+        expr: max(up{job="eqa"}) == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: No EQA exporter is reachable
+      - alert: EQAReconcileSilent
+        expr: time() - max by (namespace, autoscaler) (eqa_last_reconcile_timestamp_seconds) > 600
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Autoscaler stopped producing decisions
+      - alert: EQAConvergenceDelayed
+        # Ignore stale leader data after failover; never use timeout to roll back count.
+        expr: max by (namespace, autoscaler) (eqa_pending_seconds and on (namespace, autoscaler, instance) (time() - eqa_last_reconcile_timestamp_seconds < 120)) > 1200
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Elasticsearch convergence is taking more than 20 minutes

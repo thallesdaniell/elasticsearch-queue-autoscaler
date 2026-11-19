@@ -1,0 +1,29 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.7'
+          cache: true
+      - uses: azure/setup-helm@v4.3.0
+        with:
+          version: v3.17.3
+      - run: go mod download
+      - run: make verify
+      - run: make local-check
+      - run: docker compose config --quiet
+      - run: git diff --exit-code -- api config charts go.mod go.sum
+      - run: docker build -t eqa:ci .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out

@@ -1,0 +1,51 @@
+# Replace the illustrative metric and endpoint with your real source.
+# Install KEDA separately. Target our CR, NEVER the ECK StatefulSet.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: search-demand
+  namespace: elastic-system
+spec:
+  scaleTargetRef:
+    apiVersion: autoscaling.queue-autoscaler.io/v1alpha1
+    kind: ElasticsearchQueueAutoscaler
+    name: search-queue
+  pollingInterval: 30
+  minReplicaCount: 3
+  maxReplicaCount: 12
+  advanced:
+    restoreToOriginalReplicaCount: false
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          selectPolicy: Disabled
+        scaleUp:
+          stabilizationWindowSeconds: 120
+          policies:
+            - type: Pods
+              value: 2
+              periodSeconds: 60
+  triggers:
+    - type: prometheus
+      name: indexing-backlog
+      metricType: AverageValue
+      metadata:
+        serverAddress: http://prometheus.monitoring.svc:9090
+        # One total backlog, with a freshness filter; missing data is not zero.
+        query: max(indexing_queue_backlog{queue="indexing"} and (time() - timestamp(indexing_queue_backlog{queue="indexing"}) < 120))
+        threshold: "100000"
+        ignoreNullValues: "false"
+    - type: cron
+      name: business-hours
+      metadata:
+        timezone: America/Recife
+        start: 0 8 * * 1-5
+        end: 0 18 * * 1-5
+        desiredReplicas: "5"
+    - type: cron
+      name: peak
+      metadata:
+        timezone: America/Recife
+        start: 0 10 * * 1-5
+        end: 0 12 * * 1-5
+        desiredReplicas: "8"

@@ -1,0 +1,150 @@
+# Alternative to autoscaler.yaml + scaledobject.yaml, not an additional writer.
+# Illustrative capacities/metric only. Existing Elasticsearch "search" must contain
+# data-contacts and data-perc and authorize both CRs with this annotation:
+# queue-autoscaler.io/owners: '{"data-contacts":"search-contacts","data-perc":"search-percolate"}'
+# Extend KEDA /scale RBAC and ArgoCD ignores to these exact CRs/NodeSets.
+# Schedules DO NOT downscale at the end. Percolate needs the SPEC.md capacity gate.
+apiVersion: autoscaling.queue-autoscaler.io/v1alpha1
+kind: ElasticsearchQueueAutoscaler
+metadata:
+  name: search-contacts
+  namespace: elastic-system
+spec:
+  targetRef:
+    name: search
+    nodeSet: data-contacts
+  mode: Audit
+  provider: KEDA
+  requestedReplicas: 4
+  scaling:
+    minReplicas: 4
+    maxReplicas: 12
+    maxStep: 2
+    pollSeconds: 30
+    stabilizationSeconds: 120
+    cooldownSeconds: 600
+    convergenceTimeoutSeconds: 2700
+  safety:
+    requiredHealth: green
+    requireDistinctNodes: false
+    maxDiskUsedPercent: 90
+    maxShardsPerNode: 800
+    blockScaleDown: true
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: search-contacts-demand
+  namespace: elastic-system
+spec:
+  scaleTargetRef:
+    apiVersion: autoscaling.queue-autoscaler.io/v1alpha1
+    kind: ElasticsearchQueueAutoscaler
+    name: search-contacts
+  pollingInterval: 30
+  minReplicaCount: 4
+  maxReplicaCount: 12
+  advanced:
+    restoreToOriginalReplicaCount: false
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          selectPolicy: Disabled
+        scaleUp:
+          stabilizationWindowSeconds: 120
+          policies:
+          - type: Pods
+            value: 2
+            periodSeconds: 60
+  triggers:
+  - type: cron
+    name: week
+    metadata:
+      timezone: America/Recife
+      start: 0 6 * * 1-5
+      end: 0 21 * * 1-5
+      desiredReplicas: '8'
+  - type: cron
+    name: saturday
+    metadata:
+      timezone: America/Recife
+      start: 0 6 * * 6
+      end: 0 15 * * 6
+      desiredReplicas: '8'
+  - type: cron
+    name: sunday
+    metadata:
+      timezone: America/Recife
+      start: 0 6 * * 0
+      end: 0 10 * * 0
+      desiredReplicas: '8'
+---
+apiVersion: autoscaling.queue-autoscaler.io/v1alpha1
+kind: ElasticsearchQueueAutoscaler
+metadata:
+  name: search-percolate
+  namespace: elastic-system
+spec:
+  targetRef:
+    name: search
+    nodeSet: data-perc
+  mode: Audit
+  provider: KEDA
+  requestedReplicas: 2
+  scaling:
+    minReplicas: 2
+    maxReplicas: 40
+    maxStep: 2
+    pollSeconds: 30
+    stabilizationSeconds: 120
+    cooldownSeconds: 600
+    convergenceTimeoutSeconds: 2700
+  safety:
+    requiredHealth: green
+    requireDistinctNodes: false
+    maxDiskUsedPercent: 90
+    maxShardsPerNode: 800
+    blockScaleDown: true
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: search-percolate-demand
+  namespace: elastic-system
+spec:
+  scaleTargetRef:
+    apiVersion: autoscaling.queue-autoscaler.io/v1alpha1
+    kind: ElasticsearchQueueAutoscaler
+    name: search-percolate
+  pollingInterval: 30
+  minReplicaCount: 2
+  maxReplicaCount: 40
+  advanced:
+    restoreToOriginalReplicaCount: false
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          selectPolicy: Disabled
+        scaleUp:
+          stabilizationWindowSeconds: 120
+          policies:
+          - type: Pods
+            value: 2
+            periodSeconds: 60
+  triggers:
+  - type: prometheus
+    name: indexing-backlog
+    metricType: AverageValue
+    metadata:
+      serverAddress: http://prometheus.monitoring.svc:9090
+      query: max(indexing_queue_backlog{queue="indexing"} and (time() - timestamp(indexing_queue_backlog{queue="indexing"})
+        < 120))
+      threshold: '100000'
+      ignoreNullValues: 'false'
+  - type: cron
+    name: business-hours
+    metadata:
+      timezone: America/Recife
+      start: 0 10 * * 1-5
+      end: 0 22 * * 1-5
+      desiredReplicas: '5'

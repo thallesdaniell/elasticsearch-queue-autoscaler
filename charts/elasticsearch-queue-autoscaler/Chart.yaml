@@ -1,0 +1,6 @@
+apiVersion: v2
+name: elasticsearch-queue-autoscaler
+description: Scale-up-only ECK Data Node autoscaler using KEDA demand and schedule floors
+type: application
+version: 0.2.0
+appVersion: "v0.2.0"
